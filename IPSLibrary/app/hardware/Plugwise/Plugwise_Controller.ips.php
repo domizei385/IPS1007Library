@@ -55,7 +55,7 @@
 	switch ($_IPS['SENDER'])
 			{
 			Case "RunScript"			:	break;
-			Case "Execute"				:	break;
+			Case "Execute"				:	berechne_restverbrauch();break;
 			Case "TimerEvent"			:	request_circle_data();
 												berechne_gruppenverbrauch();
 												hole_gesamtverbrauch();
@@ -374,9 +374,9 @@ function plugwise_0013_received($buf)
 		if ( GetValueFloat($id) != $Leistung )
 			SetValueFloat($id,$Leistung);
 
-		$id = IPS_GetVariableIDByName ("Status", $myCat);
-		if ( GetValue($id) <> true)
-			SetValue($id,True);
+//		$id = IPS_GetVariableIDByName ("Status", $myCat);
+//		if ( GetValue($id) <> true)
+//			SetValue($id,True);
 
 		$time = date('Y-m-d H:i:s');
 		
@@ -468,8 +468,10 @@ function plugwise_0024_received($buf)
 
 	$einaus = substr($buf,41,1);
 	$id = IPS_GetVariableIDByName("Status",$myCat);
-	if ( GetValue($id) != $einaus )
-		SetValue(IPS_GetVariableIDByName("Status",$myCat),$einaus);
+	$aktstatus1 = GetValue($id);
+	
+	if ( GetValue($id) != $einaus ){ 
+		SetValue(IPS_GetVariableIDByName("Status",$myCat),$einaus);}
 
 	//SetValue(IPS_GetVariableIDByName("LogAddress",$myCat),intval((hexdec(substr($buf,32,8)) - 278528) / 32));
 	
@@ -664,14 +666,14 @@ function plugwise_0049_received($buf)
 			$ti2 = date('Y-m-d H:i:s',$usedlogdate);
       	mysql_add(MYSQL_TABELLE_GESAMT,$ti2, IPS_GetName($myCat),$verbrauch);
 
-			IPS_LogMessage("Stunde bereits gezaehlt",$ti1."-".$ti2);
+			//IPS_LogMessage("Stunde bereits gezaehlt",$ti1."-".$ti2);
 			}
 		else
 		   {
 			$ti1 = date('Y-m-d H:i:s',$ti1);
 			$ti2 = date('Y-m-d H:i:s',$usedlogdate);
 
-			IPS_LogMessage("Stunde wird gezaehlt",$ti1."-".$ti2);
+			//IPS_LogMessage("Stunde wird gezaehlt",$ti1."-".$ti2);
 
 			//$time = date('d.m.y H:i:s');
 
@@ -795,29 +797,35 @@ function hole_gesamtverbrauch()
 	GLOBAL $idCatOthers;
 	GLOBAL $idCatCircles;
 	GLOBAL $SystemStromzaehlerGroups;
-	
+	GLOBAL $CircleGroups;
+
+
 	// Wo soll der Gesamtverbrauch hin
 	$id1 = @IPS_GetObjectIDByIdent("SYSTEM_MAIN",$idCatOthers);
 	if ( $id1 == false )
 		$id1 = IPS_GetObjectIDByIdent("Gesamt",$idCatOthers);
 
 	// IDs aus der Konfig lesen
-	$id_gesamtverbrauch = 0;
+	$id_gesamt = 0;
 	$id_leistung = 0;
 
    if ( defined('ID_GESAMTVERBRAUCH') )
 		if ( ID_GESAMTVERBRAUCH != 0 )
-			$id_gesamtverbrauch = ID_GESAMTVERBRAUCH;
+			$id_gesamt = ID_GESAMTVERBRAUCH;
 
    if ( defined('ID_LEISTUNG') )
 		if ( ID_LEISTUNG != 0 )
 			$id_leistung = ID_LEISTUNG;
 
+
+
 	if ( isset( $SystemStromzaehlerGroups[0][2] ) )
       $id_leistung = intval($SystemStromzaehlerGroups[0][2]);
 
-	if ( isset( $SystemStromzaehlerGroups[1][2] ) )
-      $id_gesamt = intval($SystemStromzaehlerGroups[1][2]);
+	if ( isset( $SystemStromzaehlerGroups[0][3] ) )
+      $id_gesamt = intval($SystemStromzaehlerGroups[0][3]);
+
+
 
 	// wenn id nicht 0 kopiere Gesamtverbrauch nach Plugwise
 	if ( $id_gesamt != 0 )
@@ -843,19 +851,36 @@ function hole_gesamtverbrauch()
 
 	   	}
 	   	
-	// wenn 0 dann alle Circles addieren
+	// wenn 0 dann alle Circles addieren die in Config mit TRUE
    if ( $id_leistung == 0 and $id_gesamt == 0)
       {
 		$l = 0;
 		$g = 0;
-		foreach(IPS_GetChildrenIDs($idCatCircles) as $item)
-			{  
-			$data = GetValueFloat(IPS_GetObjectIDByIdent("Leistung",$item));
-			$l = $l + $data;
-			$data = GetValueFloat(IPS_GetObjectIDByIdent("Gesamtverbrauch",$item));
-			$g = $g + $data;
 
-			}
+
+		foreach($CircleGroups as $item)
+		   {
+		   
+		   if ( $item[7] == true or $item[7] == 1 or $item[7] == "1" )
+		      {
+		      
+		   	$id = @IPS_GetObjectIDByIdent($item[0],$idCatCircles);
+		   	
+		      if ( $id )
+		         {
+					$data = GetValueFloat(IPS_GetObjectIDByIdent("Leistung",$id));
+					$l = $l + $data;
+					$data = GetValueFloat(IPS_GetObjectIDByIdent("Gesamtverbrauch",$id));
+					$g = $g + $data;
+					}
+				}
+
+		   }
+		   
+
+
+
+
 
 		$id = IPS_GetObjectIDByIdent('Leistung',$id1);
       if (GetValue($id) <> $l)
@@ -877,6 +902,8 @@ function hole_gesamtverbrauch()
 function berechne_restverbrauch()
 	{
 	GLOBAL $idCatOthers;
+	GLOBAL $CircleGroups;
+	GLOBAL $idCatCircles;
 
    $id = IPS_GetObjectIDByIdent("SYSTEM_MAIN",$idCatOthers);
    $so = IPS_GetObjectIDByIdent("SYSTEM_REST",$idCatOthers);
@@ -889,23 +916,40 @@ function berechne_restverbrauch()
 
    $others = IPS_GetChildrenIDs($idCatOthers);
 
-	$sonst_leistung = $gesamt_leistung;
-	$sonst_gesamt   = $gesamt_gesamt;
-	
-	foreach ( $others as $other)
-	   {  // gehe alle Gruppen durch ausser Hauptzaehler und Sonstige
-	   
-	   $object = IPS_GetObject($other);
-	   if ( $object['ObjectIdent'] != "SYSTEM_MAIN" )
-	   if ( $object['ObjectIdent'] != "SYSTEM_REST" )
-	      {
-			$gruppen_verbrauch = GetValueFloat(IPS_GetObjectIDByIdent("Gesamtverbrauch",$other));
-			$gruppen_leistung  = GetValueFloat(IPS_GetObjectIDByIdent("Leistung",$other));
-			
-			$sonst_leistung = $sonst_leistung - $gruppen_leistung;
-			}
-	   }
 
+	$l = 0;
+	$g = 0;
+
+	foreach($CircleGroups as $item)
+		{
+
+		if ( $item[7] == true or $item[7] == 1 or $item[7] == "1" )
+		   {
+
+		   $id = @IPS_GetObjectIDByIdent($item[0],$idCatCircles);
+
+		   if ( $id )
+		      {
+				$data = GetValueFloat(IPS_GetObjectIDByIdent("Leistung",$id));
+				//echo "\n".$data;
+				$l = $l + $data;
+				//echo "-".$l;
+				$data = GetValueFloat(IPS_GetObjectIDByIdent("Gesamtverbrauch",$id));
+				$g = $g + $data;
+				}
+			}
+
+		}
+
+	//echo "\n".$gesamt_leistung."-".$gesamt_gesamt;
+
+   $sonst_leistung = $gesamt_leistung - $l ;
+   $sonst_gesamt   = $gesamt_gesamt - $g ;
+
+	if ( $sonst_leistung < 0 ) $sonst_leistung = 0;
+	if ( $sonst_gesamt < 0 ) $sonst_gesamt = 0;
+
+	//echo "\n".$sonst_leistung."-".$sonst_gesamt;
 	SetValue($sonstid_leistung,$sonst_leistung);
 	SetValue($sonstid_gesamt,$sonst_gesamt);
 
