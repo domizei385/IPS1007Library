@@ -127,7 +127,18 @@
   // Timer fuer Plugwise_Recalibrate
   //****************************************************************************  
   $ScriptId = IPS_GetScriptIDByName('Plugwise_Recalibrate', $CategoryIdApp );
-  $id = CreateTimer_OnceADay ("REFRESH",$ScriptId,3,0);
+  $id = CreateTimer_OnceADay ("REFRESH",$ScriptId,intval(CALIBRATION_TIME),15);
+
+  //****************************************************************************
+  // Timer fuer Plugwise_CheckUpdate
+  //****************************************************************************  
+  if ( defined('CHECK_VERSION') and defined('CHECK_VERSION_TIME') )                                           
+    if (CHECK_VERSION != FALSE )
+      {
+      $ScriptId = IPS_GetScriptIDByName('Plugwise_CheckUpdate', $CategoryIdApp );
+      $id = CreateTimer_OnceADay ("REFRESH",$ScriptId,intval(CHECK_VERSION_TIME),15);
+      }
+
 
   
   //****************************************************************************
@@ -314,6 +325,18 @@
 	$IDCircles   = CreateDummyInstance("Stromzähler",$VisuID_menu,20);
   IPS_SetHidden($IDCircles,true);
   
+  // alternativer button ?
+  if ( defined('ALT_BUTTON_NORMAL') )
+    if (ALT_BUTTON_NORMAL!= FALSE )
+      {
+      $normal_file  = IPS_GetKernelDir() ."webfront\\user\\Plugwise\\".ALT_BUTTON_NORMAL;
+      $dest_file    = IPS_GetKernelDir() ."webfront\\user\\Plugwise\\tabPane.png";
+      copy ( $normal_file,$dest_file);
+      $tabbutton  = "user/Plugwise/tabPane.png";
+      $WFC_TabPaneName = "<img src='".$tabbutton."' height=32  width=150 align='top' alt='".$WFC_TabPaneName."'>";
+
+      }
+  
 	CreateWFCItemSplitPane ($WFC_ConfigId, $WFC_TabPaneItem, $WFC_TabPaneParent , 20 , $WFC_TabPaneName   , ''  , 1 /*Horizontal*/, 30 /*Width*/, 0 /*Target=Pane1*/, 0 /*UsePercentage*/, 'true');
 	CreateWFCItemCategory  ($WFC_ConfigId, $WFC_TabPaneItem."-MENU", $WFC_TabPaneItem, 10, "Titel", $Icon="", $VisuID_menu, $BarBottomVisible='true' , $BarColums=9, $BarSteps=5, $PercentageSlider='true');
 
@@ -383,6 +406,8 @@
     $id = CreateVariable("OnlineUpdate", 1, $VisuID_data2, 10, "Plugwise_MenuScripte", $ActionScriptId, false);
     IPS_SetInfo($id,"Script");
     $id = CreateVariable("Versionsinfo", 1, $VisuID_data2, 20, "Plugwise_MenuScripte", $ActionScriptId, false);
+    IPS_SetInfo($id,"Script");
+    $id = CreateVariable("Update vorhanden?", 1, $VisuID_data2, 20, "Plugwise_MenuScripte", $ActionScriptId, false);
     IPS_SetInfo($id,"Script");
     
 

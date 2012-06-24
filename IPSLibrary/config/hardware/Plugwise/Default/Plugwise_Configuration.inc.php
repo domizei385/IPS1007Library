@@ -45,13 +45,29 @@
 *                       Bei TRUE werden neu gefundene Circles automatisch angelegt
 *                       ( Vorsicht bei vielen Circles ) im Moment nicht sinnvoll
 *                       Daten der Circles muessen trotzdem unten eingetragen werden                                        
+*   CHECK_VERSION     - suche nach neuer Version ( Standard FALSE )
+*   CHECK_VERSION_TIME- Uhrzeit zu der nach einem Update gesucht wird.
+*                       Nur wenn CHECK_VERSION auf TRUE   ( Stunde )                 
+*   ALT_BUTTON_NORMAL - benutze eigenen Button fuer Tab im Webfront
+*                       ( Standard FALSE )
+*                       zum aktivieren Filenamen eingeben.
+*                       Beispiel "meineButton.png" 
+*   ALT_BUTTON_RED    - benutze eigenen Button fuer Tab im Webfront
+*                       ( Standard FALSE )
+*                       zum aktivieren Filenamen eingeben.
+*                       Beispiel "meineButtonred.png"
+*                       Dieser Button wird angezeigt wenn Update verfuegbar 
 *******************************************************************************/
-	define ( 'COMPORT'         , 'COM4' );       	
-	define ( 'REFRESH_TIME'    , 1      );         
-	define ( 'CALIBRATION_TIME', 3      );     
-	define ( 'WAIT_TIME'       , 300    );          
-  define ( 'AUTOCREATECIRCLE', false  );    
-	
+	define ( 'COMPORT'           , 'COM4' );       	
+	define ( 'REFRESH_TIME'      , 1      );         
+	define ( 'CALIBRATION_TIME'  , 3      );     
+	define ( 'WAIT_TIME'         , 300    );          
+  define ( 'AUTOCREATECIRCLE'  , false  );    
+	define ( 'CHECK_VERSION'     , false  ); 	
+	define ( 'CHECK_VERSION_TIME', 4      ); 	
+  define ( 'ALT_BUTTON_NORMAL' , false  ); 	
+  define ( 'ALT_BUTTON_RED'    , false  ); 	
+
 
 /***************************************************************************//**
 * Circle Gruppen ( bei Aenderungen Update ausfuehren )
@@ -199,6 +215,8 @@
 *   MYSQL_DATENBANK         - MySQL-Datenbankname (Standard = Plugwise)
 *   MYSQL_TABELLE_LEISTUNG  - MySQL-Tab Leistung  (Standard = Leistung)
 *   MYSQL_TABELLE_GESAMT    - MySQL-Tab Verbrauch (Standard = Gesamtverbrauch)
+* wird eine Variable angegeben zB aus der ____autoload.php muss diese als
+* GLOBAL definiert werden. ( GLOBAL $MYSQL_SERVER; )
 *******************************************************************************/
 	define ( 'MYSQL_ANBINDUNG'         , false );
 	define ( 'MYSQL_SERVER'            , '192.168.10.1' );
