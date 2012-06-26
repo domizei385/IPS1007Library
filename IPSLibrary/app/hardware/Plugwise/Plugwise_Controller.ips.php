@@ -858,6 +858,9 @@ function request_circle_data() {
             // laenger als 5 Minuten keine Daten
             if ( GetValue($idError ) != 1 )
                 SetValue($idError, 1);
+            $id = IPS_GetVariableIDByName("Leistung", $item);
+            if ( GetValue($id ) != 0 )
+                SetValue($id,0);
         } else {
             if ( GetValue($idError ) != 0 )
                 SetValue($idError, 0);
