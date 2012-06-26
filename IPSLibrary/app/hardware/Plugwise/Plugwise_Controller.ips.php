@@ -55,7 +55,7 @@
 	switch ($_IPS['SENDER'])
 			{
 			Case "RunScript"			:	break;
-			Case "Execute"				:	berechne_restverbrauch();break;
+			Case "Execute"				:	berechne_gruppenverbrauch();break;
 			Case "TimerEvent"			:	
 												berechne_gruppenverbrauch();
 												hole_gesamtverbrauch();
@@ -342,26 +342,49 @@ function plugwise_0013_received($buf)
 		}
 	else
 		{
-		$gainA	 = GetValueFloat(IPS_GetVariableIDByName("gaina", $myCat));
-		$gainB	 = GetValueFloat(IPS_GetVariableIDByName("gainb", $myCat));
-		$offTotal = GetValueFloat(IPS_GetVariableIDByName("offTotal", $myCat));
-		$offNoise = GetValueFloat(IPS_GetVariableIDByName("offNoise", $myCat));
+		$gainA	 = @GetValueFloat(IPS_GetVariableIDByName("gaina", $myCat));
+		$gainB	 = @GetValueFloat(IPS_GetVariableIDByName("gainb", $myCat));
+		$offTotal = @GetValueFloat(IPS_GetVariableIDByName("offTotal", $myCat));
+		$offNoise = @GetValueFloat(IPS_GetVariableIDByName("offNoise", $myCat));
       
 		$kalib_str = @GetValueString(IPS_GetVariableIDByName("Kalibrierdaten", $myCat));
 		if ( $kalib_str != false )
 		   {
-         
+			$debug = false;
+			
 		   //IPS_LogMessage("Kalibrierdaten vorhanden",$kalib_str);
 		   $kalib_array = explode(";", $kalib_str);
-         $gainA_    = @floatval($kalib_array[0]);
-         $gainB_    = @$kalib_array[1];
-			$offTotal_ = @$kalib_array[2];
-			$offNoise_ = @$kalib_array[3];
+         $gainA_      = @floatval($kalib_array[0]);
+         $gainB_      = @floatval($kalib_array[1]);
+			$offTotal_   = @floatval($kalib_array[2]);
+			$offNoise_   = @floatval($kalib_array[3]);
 
 			$diff = $gainA - $gainA_;
-			
-			//if ($gainA != $gainA_ )
-			   //IPS_LogMessage("Kalibrierdaten ungleich gainA","[".$gainA."][".$gainA_."]".$diff);
+
+			if ( $debug )
+			   {
+				if ( round($gainA,10) != round($gainA_,10) )
+			   	IPS_LogMessage("Kalibrierdaten ungleich gainA","[".$gainA."][".$gainA_."]".$diff);
+				else
+					IPS_LogMessage("Kalibrierdaten gleich gainA","[".$gainA."][".$gainA_."]".$diff);
+				if ( round($gainB,10) != round($gainB_,10) )
+			   	IPS_LogMessage("Kalibrierdaten ungleich gainB","[".$gainB."][".$gainB_."]".$diff);
+				else
+					IPS_LogMessage("Kalibrierdaten gleich gainB","[".$gainB."][".$gainB_."]".$diff);
+				if ( round($offTotal,10) != round($offTotal_,10) )
+			   	IPS_LogMessage("Kalibrierdaten ungleich offTotal","[".$offTotal."][".$offTotal_."]".$diff);
+				else
+					IPS_LogMessage("Kalibrierdaten gleich offTotal","[".$offTotal."][".$offTotal_."]".$diff);
+				if ( round($offNoise,10) != round($offNoise_,10) )
+			   	IPS_LogMessage("Kalibrierdaten ungleich offNoise","[".$offNoise."][".$offNoise_."]".$diff);
+				else
+					IPS_LogMessage("Kalibrierdaten gleich offNoise","[".$offNoise."][".$offTotal_."]".$diff);
+				}
+
+			$gainA	 = $gainA_;
+			$gainB	 = $gainB_;
+			$offTotal = $offTotal_;
+			$offNoise = $offNoise_;
 
 
 		   }
@@ -546,17 +569,17 @@ function plugwise_0027_received($buf)
 	$offTotal = bintofloat(substr($buf,40,8));
 	$offNoise = bintofloat(substr($buf,48,8));
 
-	SetValueFloat(CreateVariable("gaina",2,$myCat,0,"")	,bintofloat(substr($buf,24,8)));
-	SetValueFloat(CreateVariable("gainb",2,$myCat,0,"")	,bintofloat(substr($buf,32,8)));
-	SetValueFloat(CreateVariable("offTotal",2,$myCat,0,""),bintofloat(substr($buf,40,8)));
+	//SetValueFloat(CreateVariable("gaina",2,$myCat,0,"")	,bintofloat(substr($buf,24,8)));
+	//SetValueFloat(CreateVariable("gainb",2,$myCat,0,"")	,bintofloat(substr($buf,32,8)));
+	//SetValueFloat(CreateVariable("offTotal",2,$myCat,0,""),bintofloat(substr($buf,40,8)));
 	if (substr($buf,48,8)=="00000000")
 	   {
-		SetValueFloat(CreateVariable("offNoise",2,$myCat,0,""),0);
+		//SetValueFloat(CreateVariable("offNoise",2,$myCat,0,""),0);
       $offNoise = 0;
 		}
 	else
 		{
-		SetValueFloat(CreateVariable("offNoise",2,$myCat,0,""),bintofloat(substr($buf,48,8)));
+		//SetValueFloat(CreateVariable("offNoise",2,$myCat,0,""),bintofloat(substr($buf,48,8)));
       $offNoise = bintofloat(substr($buf,48,8));
 		}
 		
@@ -620,7 +643,7 @@ function plugwise_0049_received($buf)
 	$mcID = substr($buf,8,16);
 
 	$group_name = find_group($mcID);
-
+	
 	$LogAddressRaw = substr($buf,88,8);
 
 	if ( !$myCat)
@@ -633,10 +656,32 @@ function plugwise_0049_received($buf)
 	//***************************************************************************
 	// Kalibrierungsdaten laden
 	//***************************************************************************
-	$gaina	 = GetValueFloat(IPS_GetVariableIDByName("gaina", $myCat));
-	$gainb	 = GetValueFloat(IPS_GetVariableIDByName("gainb", $myCat));
-	$offTotal = GetValueFloat(IPS_GetVariableIDByName("offTotal", $myCat));
-	$offNoise = GetValueFloat(IPS_GetVariableIDByName("offNoise", $myCat));
+	$gaina	 = @GetValueFloat(IPS_GetVariableIDByName("gaina", $myCat));
+	$gainb	 = @GetValueFloat(IPS_GetVariableIDByName("gainb", $myCat));
+	$offTotal = @GetValueFloat(IPS_GetVariableIDByName("offTotal", $myCat));
+	$offNoise = @GetValueFloat(IPS_GetVariableIDByName("offNoise", $myCat));
+
+	$kalib_str = @GetValueString(IPS_GetVariableIDByName("Kalibrierdaten", $myCat));
+	if ( $kalib_str != false )
+		{
+		//IPS_LogMessage("Kalibrierdaten vorhanden",$kalib_str);
+		$kalib_array = explode(";", $kalib_str);
+      $gainA_      = @floatval($kalib_array[0]);
+      $gainB_      = @floatval($kalib_array[1]);
+		$offTotal_   = @floatval($kalib_array[2]);
+		$offNoise_   = @floatval($kalib_array[3]);
+
+		$gaina	 = $gainA_;
+		$gainb	 = $gainB_;
+		$offTotal = $offTotal_;
+		$offNoise = $offNoise_;
+
+		}
+
+	//IPS_logMessage("........",$gaina);
+	//IPS_logMessage("........",$gainb);
+	//IPS_logMessage("........",$offTotal);
+	//IPS_logMessage("........",$offNoise);
 
 	$verbrauch = 0;
 	$bufferstelle = 0;
@@ -704,7 +749,15 @@ function plugwise_0049_received($buf)
 		   {
 			$ti1 = date('Y-m-d H:i:s',$ti1);
 			$ti2 = date('Y-m-d H:i:s',$usedlogdate);
-      	mysql_add(MYSQL_TABELLE_GESAMT,$ti2, IPS_GetName($myCat),$verbrauch);
+			
+			//$time = date('d.m.y H:i:s');
+			$lad = hexdec($LogAddressRaw);
+			$lad = $lad + ( $bufferstelle * 8 );
+			$lad = dechex($lad);
+
+      	//mysql_add(MYSQL_TABELLE_GESAMT,$ti2, IPS_GetName($myCat),$verbrauch);
+      	mysql_add(MYSQL_TABELLE_GESAMT,$ti2, IPS_GetName($myCat),$verbrauch,$myCat,$group_name,$lad);
+     		
 
 			//IPS_LogMessage("Stunde bereits gezaehlt",$ti1."-".$ti2);
 			}
@@ -830,8 +883,8 @@ function request_circle_data()
   
 /***************************************************************************//**
 * Gesamtverbrauch holen
-* Im Konfigurationsfile die IDs der Variablen holen und in Data schreiben
-* Zum Einbinden von Stromzaehlern zB (EKM)
+* 
+* 
 *******************************************************************************/
 function hole_gesamtverbrauch()
 	{
@@ -1005,21 +1058,32 @@ function berechne_gruppenverbrauch()
 	GLOBAL $CircleGroups;
 	GLOBAL $idCatCircles;
 	GLOBAL $idCatOthers;
+   GLOBAL $ExterneStromzaehlerGroups;
    
 	$others = IPS_GetChildrenIDs($idCatOthers);
 
 
-   $array = array();
+   // erstelle ein array mit den Gruppen aus den Circles
    foreach ( $CircleGroups as $group )
       {
       if ( $group[0] != "" )
          {
-			$array_leistung[$group[2]] = 0;
+			$array_leistung[$group[2]]  = 0;
 			$array_verbrauch[$group[2]] = 0;
 			}
 		}
+	// fuege die externen Gruppen hinzu
+   foreach ( $ExterneStromzaehlerGroups as $group )
+      {
+      if ( $group[0] != "" )
+         {
+			$array_leistung[$group[1]]  = 0;
+			$array_verbrauch[$group[1]] = 0;
+			}
+		}
 
-	
+
+	// gehe alle Circles durch
 	foreach ( $CircleGroups as $group )
 		{
       if ( $group[0] != "" )
@@ -1056,6 +1120,43 @@ function berechne_gruppenverbrauch()
 		}
 
 
+	// gehe alle externen durch
+	foreach ( $ExterneStromzaehlerGroups as $group )
+		{
+      if ( $group[0] != "" )
+         {
+			$mac 	        = $group[0];
+			$gruppe       = $group[1];
+			$id_leistung  = intval($group[2]);
+			$id_verbrauch = intval($group[3]);
+
+			
+			if ( isset($group[7]) )
+			   {
+				$in_gesamt = $group[7];
+				}
+			else
+			   {
+			   $in_gesamt = true;
+			   }
+
+			if ( $in_gesamt )
+			   {  // soll in Gruppe gezaehlt werden
+				//echo $id_leistung;
+		   	$leistung  = GetValue($id_leistung);
+				//echo $leistung;
+		   	$verbrauch = GetValue($id_verbrauch);
+				$array_leistung[$gruppe]  = $array_leistung[$gruppe]  + $leistung;
+				$array_verbrauch[$gruppe] = $array_verbrauch[$gruppe] + $verbrauch;
+
+
+			   }
+
+			}
+		}
+		
+
+	// Werte in die Gruppen Variablen schreiben
 	$keys = array_keys($array_leistung);
 	
 	foreach ( $keys as $gruppe )
@@ -1073,8 +1174,10 @@ function berechne_gruppenverbrauch()
 			SetValue($id,$wert);
 
 	   }
-
-
+	   
+	   
+	//print_r($array_leistung);
+	//print_r($array_verbrauch);
 	}
 
 /***************************************************************************//**
