@@ -504,9 +504,7 @@ function plugwise_0024_received($buf)
 		return;
 	   }
 
-   $t = GetValue(IPS_GetVariableIDByName ("LastMessage", $myCat));
-	$t = microtime(true) - $t ;
-	SetValue(IPS_GetVariableIDByName ("LastMessage", $myCat),$t);
+    SetValue(IPS_GetVariableIDByName("LastMessage", $myCat), microtime(true));
 
 
 	$einaus = substr($buf,41,1);
@@ -841,44 +839,38 @@ function handle_webfront($variable)
 /***************************************************************************//**
 *	Alle Circles durchlaufen, Status und Verbrauch lesen
 *******************************************************************************/
-function request_circle_data()
-	{
-	GLOBAL $idCatCircles;
+function request_circle_data() {
+    GLOBAL $idCatCircles;
 
-	$now = time();
-	
-	foreach(IPS_GetChildrenIDs($idCatCircles) as $item)
-		{  // alle Unterobjekte durchlaufen
-		$obj = IPS_GetVariable(IPS_GetObjectIDByIdent("LastMessage",$item));
-		$t = ($now - ($obj["VariableUpdated"]))/60; // Zeit in Minuten wann letzte Aktualisierung
-      //SetValue(IPS_GetVariableIDByName ("LastMessage", $item),$t);
-		//IPS_LogMessage(".........",$t);
-		$id = IPS_GetObjectIDByIdent("LastMessage",$item);
-		$t = GetValue($id);
-      if ( $t > 5 )  // laenger als 5 Minuten keine Daten
-      	{
-      	$id = IPS_GetVariableIDByName("Error", $item);
-			if ( GetValue($id ) != 1 )
-				SetValue($id,1);
-			}
-		else
-		   {
-      	$id = IPS_GetVariableIDByName("Error", $item);
-			if ( GetValue($id ) != 0 )
-				SetValue($id,0);
-			}
-			
-		$id_info = IPS_GetObject($item);
+    $now = time();
+    
+    // alle Unterobjekte durchlaufen
+    foreach(IPS_GetChildrenIDs($idCatCircles) as $item) {
+        $idLastMessage = IPS_GetObjectIDByIdent("LastMessage",$item);
+        
+        $obj = IPS_GetVariable($idLastMessage);
+        // Zeit in Minuten seit letzter Aktualisierung
+        $t = ($now - ($obj["VariableUpdated"])) / 60;
+        //IPS_LogMessage(".........",$t);
+        $idError = IPS_GetVariableIDByName("Error", $item);
+        
+        if ( $t > 5 ) {
+            // laenger als 5 Minuten keine Daten
+            if ( GetValue($idError ) != 1 )
+                SetValue($idError, 1);
+        } else {
+            if ( GetValue($idError ) != 0 )
+                SetValue($idError, 0);
+        }
+        $id_info = IPS_GetObject($item);
 
-		PW_SendCommand("0012".$id_info['ObjectIdent']);
-		
-		SetValue(IPS_GetVariableIDByName ("LastMessage", $item),microtime(true));
+        PW_SendCommand("0012".$id_info['ObjectIdent']);
+        
+        SetValue($idLastMessage, microtime(true));
 
-		PW_SendCommand("0023".$id_info['ObjectIdent']);
-		
-
-		}
-	}
+        PW_SendCommand("0023".$id_info['ObjectIdent']);
+    }
+}
   
   
 /***************************************************************************//**
