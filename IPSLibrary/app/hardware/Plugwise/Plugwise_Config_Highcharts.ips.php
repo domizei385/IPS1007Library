@@ -96,7 +96,7 @@
 	$serie['Unit'] = "Watt";
 	$serie['ReplaceValues'] = true;
 	
-	$serie['step'] = false;
+	$serie['step'] = true;
 	$serie['type'] = "areaspline";
 	$serie['type'] = "area";
 	$serie['yAxis'] = 0;
