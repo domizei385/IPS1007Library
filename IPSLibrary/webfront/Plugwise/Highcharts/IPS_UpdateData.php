@@ -12,9 +12,9 @@
     
     
     function getLoggedData($Series, $id_AH, $startTime, $endTime) {
-        $ret = array();
-        foreach ($Series as $Serie) {
-            $logEntries = @AC_GetLoggedValues($id_AH, $Serie['Id'], $startTime, $endTime, 0 );
+        $ret = array(); 
+        foreach ($Series as $Serie) {   
+            $logEntries = @AC_GetLoggedValues($id_AH, intval($Serie['Id']), $startTime, $endTime, 0 );
             foreach($logEntries as $logEntry) {
                 $ret[] = array(CreateDateUTC($logEntry['TimeStamp']), $logEntry['Value']);
             }
