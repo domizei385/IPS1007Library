@@ -55,8 +55,8 @@
 	switch ($_IPS['SENDER'])
 			{
 			Case "RunScript"			:	break;
-			Case "Execute"				:	update_webfront_123("REFRESH"); break;
-			Case "TimerEvent"			:	
+			Case "Execute"				:	break;
+			Case "TimerEvent"			:	ping_circles();
 												berechne_gruppenverbrauch();
 												hole_gesamtverbrauch();
 												berechne_restverbrauch();
@@ -72,6 +72,7 @@
 													case "0000":	plugwise_0000_received($buf);	break;
 													case "0003":	plugwise_0003_received($buf);	break;
 													case "0006":	plugwise_0006_received($buf); break;
+													case "000E":	plugwise_000E_received($buf); break;
 													case "0011":  	plugwise_0011_received($buf);	break;
 													case "0013":	plugwise_0013_received($buf); break;
 													case "0019":   plugwise_0019_received($buf);	break;
@@ -99,13 +100,39 @@ function dummy()
   
   }
 
-function test()
+
+
+
+/***************************************************************************//**
+*  Sende ein Ping "000D" an alle Circles
+*******************************************************************************/
+function ping_circles()
 	{
-	
 
+	GLOBAL $CircleGroups;
 
+	$VisuPath  = "Visualization.WebFront.Hardware.Plugwise.GRAPH";
+   $IdGraph   = @get_ObjectIDByPath($VisuPath,true);
+	$id = IPS_GetObjectIDByName('Auswahl',$IdGraph);
+	$menupunkt = GetValue($id);
+
+	if ( $menupunkt != 6 )
+	   return;
+
+   $file = 'plugwiseping.log';
+	$logdatei = IPS_GetKernelDir() . "logs\\Plugwise\\" . $file;
+	if ( file_exists($logdatei) )
+		unlink($logdatei);
+		
+	foreach( $CircleGroups as $circle)
+	   {
+	   $mac = $circle[0];
+		$cmd = "000D".$mac;
+		PW_SendCommand($cmd);
+	   }
 
 	}
+
 	
 /***************************************************************************//**
 *  Variablenaenderung
@@ -116,7 +143,6 @@ function schaltbefehl($var,$status)
 	GLOBAL $idCatCircles;
 	
 	$text = $var ."-".$status;
-	
 	
 	foreach( $CircleGroups as $circle)
 	   {
@@ -130,8 +156,17 @@ function schaltbefehl($var,$status)
 	      
 	   }
 
+
 	if ( strlen($mac) > 0 )
 	   {
+
+		if ( $status == 0 )
+			$status = false;
+		if ( $status == 1 )
+		   $status = true;
+
+	   circle_on_off($mac,$status);
+/*
 		$parent = $idCatCircles;
 		$id = 0;
 		$id = @IPS_GetObjectIDByIdent($mac,$parent);
@@ -158,6 +193,7 @@ function schaltbefehl($var,$status)
 		   
 		   }
 
+*/
 	   }
 	   
 	   
@@ -282,6 +318,34 @@ function plugwise_0006_received($buf)
 
 	}
 
+
+/***************************************************************************//**
+*	"000E" empfangen	- Ping
+*  Antwort auf "000D"
+*******************************************************************************/
+function plugwise_000E_received($buf)
+	{
+   $mac = substr($buf,8,16);
+
+   $hrssi1 = (substr($buf,24,2));
+   $hrssi2 = (substr($buf,26,2));
+   $hmsec  = (substr($buf,28,4));
+
+	$rssi1 = hexdec($hrssi1);
+	$rssi2 = hexdec($hrssi2);
+
+	//$rssi1 = $rssi1 & 127;
+	//$rssi2 = $rssi2 & 127;
+
+	$msec = hexdec($hmsec);
+
+	$text = ",".$mac.",".$rssi1.",".$rssi2.",".$msec ;
+	logging($text,'plugwiseping.log',true );
+
+
+	}
+	
+
 /***************************************************************************//**
 *	"0011" empfangen	-  Init
 *  Antwort auf "000A" - stick initialization
@@ -312,11 +376,20 @@ function plugwise_0011_received($buf)
 *******************************************************************************/
 function plugwise_0013_received($buf)
 	{
+	
 	GLOBAL $idCatCircles;
-
+   
 	$mcID = substr($buf,8,16);
 	$myCat = IPS_GetObjectIDByIdent($mcID, $idCatCircles);
 	$pulse = substr($buf,28,4);
+
+	$totalpulse = substr($buf,32,8);
+	$unknown1   = substr($buf,40,4);
+	$unknown2   = substr($buf,44,4);
+	$unknown3   = substr($buf,48,4);
+
+	$text = $mcID ."-".$totalpulse." ".$unknown1." ".$unknown2." ".$unknown3;
+	logging($text,$mcID .'plugwiseunknowninformation.log' );
 
 	if ( !$myCat)
 	   {
@@ -325,6 +398,8 @@ function plugwise_0013_received($buf)
 		return;
 	   }
 
+	$t = time()  ;
+	SetValue(IPS_GetVariableIDByName ("LastMessage", $myCat),$t);
 
 	If ($pulse == "FFFF")
 		{	// Circle ausgeschaltet, meldet FFFF ( nicht immer ?? )
@@ -333,10 +408,11 @@ function plugwise_0013_received($buf)
 		if ( GetValueFloat($id) != 0 )
 			SetValueFloat($id,0);
 		
-		$id = IPS_GetVariableIDByName ("Status", $myCat);
+		// FFFF heisst nicht ausgeschaltet !!!
+		//$id = IPS_GetVariableIDByName ("Status", $myCat);
 		//IPS_LogMessage("....",$id);
-		if ( GetValue($id) <> false)
-			SetValue($id,false);
+		//if ( GetValue($id) <> false)
+		//	SetValue($id,false);
 
 		$text = $myCat . " Circle ausgeschaltet FFFF . " . $buf;
 		logging($text,'plugwiseerror.log' );
@@ -349,6 +425,7 @@ function plugwise_0013_received($buf)
 		$offNoise = @GetValueFloat(IPS_GetVariableIDByName("offNoise", $myCat));
       
 		$kalib_str = @GetValueString(IPS_GetVariableIDByName("Kalibrierdaten", $myCat));
+		
 		if ( $kalib_str != false )
 		   {
 			$debug = false;
@@ -392,7 +469,7 @@ function plugwise_0013_received($buf)
 		
 		// keine Kalibrierung
 		if ( $gainA == 0 and $gainB == 0 and $offTotal == 0 and $offNoise == 0 )
-		   {
+		   {IPS_LogMessage("keine Kalibrierdaten vorhanden",$kalib_str);
 		   // Kalibrierungsdaten vom Circle abrufen
 		   $id_info = IPS_GetObject($myCat);
 			PW_SendCommand("0026".$id_info['ObjectIdent']);
@@ -506,19 +583,49 @@ function plugwise_0024_received($buf)
 		return;
 	   }
 
-    SetValue(IPS_GetVariableIDByName("LastMessage", $myCat), microtime(true));
+	$autorestore = false;
+   if ( defined('AUTORESTORESWITCH') )    // nach Stromausfall alten Zustand wiederherstellen
+   	if ( AUTORESTORESWITCH == true )
+         $autorestore = true;
+         
+   if ( $autorestore == false )
+      {
+	   IPS_LogMessage("Plugwise","Autorestore false");
 
-
-	$einaus = substr($buf,41,1);
-	$id = IPS_GetVariableIDByName("Status",$myCat);
-	$aktstatus1 = GetValue($id);
+		$einaus    = substr($buf,41,1);
+		$id        = IPS_GetVariableIDByName("Status",$myCat);
+		$aktstatus = GetValue($id);
 	
-	if ( GetValue($id) != $einaus ){ 
-		SetValue(IPS_GetVariableIDByName("Status",$myCat),$einaus);}
+		if ( GetValue($id) != $einaus ){
+			SetValue(IPS_GetVariableIDByName("Status",$myCat),$einaus);}
+		}
+	else
+	   {
 
-	//SetValue(IPS_GetVariableIDByName("LogAddress",$myCat),intval((hexdec(substr($buf,32,8)) - 278528) / 32));
-	
-	//SetValue(IPS_GetVariableIDByName("LogAddress",$myCat),substr($buf,32,8));
+		$einaus     = substr($buf,41,1);
+		$id         = IPS_GetVariableIDByName("Status",$myCat);
+		$sollstatus = GetValue($id);
+
+		if ( $einaus == "0" OR $einaus == "1" )
+		   {
+			if ( $einaus == "0" )
+				$iststatus = false;
+			if ( $einaus == "1" )
+				$iststatus = true;
+
+	   	//IPS_LogMessage("Plugwise",$myCat."-".$iststatus."-".$sollstatus);
+
+		   if ( $iststatus != $sollstatus )
+		      {
+	   		IPS_LogMessage("Plugwise",$myCat."- Iststatus ungleich Sollstatus");
+            circle_on_off($mcID,$sollstatus);
+		      }
+		   
+		   }
+	   
+	   }
+
+
 	
 	$logadress = intval((hexdec(substr($buf,32,8))));
 	$id = IPS_GetVariableIDByName("LogAddress",$myCat);
@@ -528,12 +635,14 @@ function plugwise_0024_received($buf)
 	$text = IPS_GetName($myCat);
 	$text = $text." Logadresse[".intval((hexdec(substr($buf,32,8)) - 278528) / 32)."][".hexdec(substr($buf,32,8))."]";
 
-	//$text = $text."[".substr($buf,24,2)." ".substr($buf,26,2)." ".substr($buf,28,4)."] ";
 
 	$hw_version = substr($buf,44,4)."-".substr($buf,48,4)."-".substr($buf,52,4);
 	$sw_version = date('d.m.Y h:i:s',hexdec(substr($buf,56,8)));
+	$nodetype = substr($buf,64,2);      // nicht in Doku
+	
 	$text = $text. " Hardwareversion: ".$hw_version;
 	$text = $text. " Softwareversion: ".$sw_version." ";
+	$text = $text. " Nodetype: ".$nodetype." ";
 
 	$info = $hw_version .",".$sw_version;
 
@@ -597,6 +706,26 @@ function plugwise_0027_received($buf)
 /***************************************************************************//**
 *	"003F" empfangen	-  aktuelle Uhrzeit empfangen
 *  Antwort auf "003E" - Uhrzeit auslesen
+*
+*	command number="003f"
+*
+*	vnumber="1.0" Plugwise.IO.Commands.V10.PWGetClockReplyV1_0
+*  	name="macId" 					length="16"
+*     name="hour" 					length="2"
+*     name="minutes" 				length="2"
+*     name="seconds" 				length="2"
+*     name="dayOfWeek" 				length="2"
+*     name="hoursNotMinutes" 		length="2"
+*
+*	vnumber="1.1" Plugwise.IO.Commands.V20.PWGetClockReplyV1_1
+*		name="macId" 					length="16"
+*   	name="hour" 					length="2"
+*		name="minutes" 				length="2"
+*     name="seconds" 				length="2"
+*     name="dayOfWeek" 				length="2"
+*     name="hoursNotMinutes" 		length="2"
+*     name="scheduleCRC" 			length="4"
+*
 *******************************************************************************/
 function plugwise_003F_received($buf)
 	{
@@ -803,7 +932,7 @@ function plugwise_0049_received($buf)
 *	"0061" empfangen	- Circle hinzugefuegt
 *  Antwort auf ?
 *******************************************************************************/
-function plugwise_00061_received($buf)
+function plugwise_0061_received($buf)
 	{
 	GLOBAL $CircleGroups;
 
@@ -828,55 +957,75 @@ function handle_webfront($variable)
 	$id_info = IPS_GetObject($id);
 	if ($_IPS['VALUE'] == 1)
 		{
-		$action = 1;
+		$action = true;
 		}
 	else
 		{
-		$action = 0;
+		$action = false;
 		}
-	$cmd = "0017".$id_info['ObjectIdent']."0".$action;
-	PW_SendCommand($cmd);
+		
+	$mac = $id_info['ObjectIdent'];
+	circle_on_off($mac,$action);
+	
+//	$cmd = "0017".$id_info['ObjectIdent']."0".$action;
+//	PW_SendCommand($cmd);
 
 	}
 	
 /***************************************************************************//**
 *	Alle Circles durchlaufen, Status und Verbrauch lesen
 *******************************************************************************/
-function request_circle_data() {
-    GLOBAL $idCatCircles;
+function request_circle_data()
+	{
+	GLOBAL $idCatCircles;
 
-    $now = time();
-    
-    // alle Unterobjekte durchlaufen
-    foreach(IPS_GetChildrenIDs($idCatCircles) as $item) {
-        $idLastMessage = IPS_GetObjectIDByIdent("LastMessage",$item);
-        
-        $obj = IPS_GetVariable($idLastMessage);
-        // Zeit in Minuten seit letzter Aktualisierung
-        $t = ($now - ($obj["VariableUpdated"])) / 60;
-        //IPS_LogMessage(".........",$t);
-        $idError = IPS_GetVariableIDByName("Error", $item);
-        
-        if ( $t > 5 ) {
-            // laenger als 5 Minuten keine Daten
-            if ( GetValue($idError ) != 1 )
-                SetValue($idError, 1);
-            $id = IPS_GetVariableIDByName("Leistung", $item);
-            if ( GetValue($id ) != 0 )
-                SetValue($id,0);
-        } else {
-            if ( GetValue($idError ) != 0 )
-                SetValue($idError, 0);
-        }
-        $id_info = IPS_GetObject($item);
+	$now = time();
+	
+	foreach(IPS_GetChildrenIDs($idCatCircles) as $item)
+		{  // alle Unterobjekte durchlaufen
+		$obj = IPS_GetVariable(IPS_GetObjectIDByIdent("LastMessage",$item));
+		$t = ($now - ($obj["VariableUpdated"]))/60; // Zeit in Minuten wann letzte Aktualisierung
+      //SetValue(IPS_GetVariableIDByName ("LastMessage", $item),$t);
+		//IPS_LogMessage(".........",$t);
+		//$id = IPS_GetObjectIDByIdent("LastMessage",$item);
+		//$t = GetValue($id);
+		
+		if ( defined('REFRESH_TIME') )
+			$refreshtime = REFRESH_TIME;
+		else
+			$refreshtime = 1 ;
+		
+		$timeoutcircle = $refreshtime * 3 ;
+      if ( $t > $timeoutcircle )  // laenger als x Minuten keine Daten
+      	{
+      	$id = IPS_GetVariableIDByName("Error", $item);
+			if ( GetValue($id ) != 1 )
+				SetValue($id,1);
+			// wenn Circle nicht erreichbar Leistung auf 0
+			IPS_LogMessage("Plugwise Circle ausgefallen",$t);
+      	$id = IPS_GetVariableIDByName("Leistung", $item);
+			if ( GetValue($id ) != 0 )
+				SetValue($id,0);
 
-        PW_SendCommand("0012".$id_info['ObjectIdent']);
-        
-        SetValue($idLastMessage, microtime(true));
+			}
+		else
+		   {
+      	$id = IPS_GetVariableIDByName("Error", $item);
+			if ( GetValue($id ) != 0 )
+				SetValue($id,0);
+			}
+			
+		$id_info = IPS_GetObject($item);
 
-        PW_SendCommand("0023".$id_info['ObjectIdent']);
-    }
-}
+		PW_SendCommand("0012".$id_info['ObjectIdent']);
+		
+		//SetValue(IPS_GetVariableIDByName ("LastMessage", $item),microtime(true));
+
+		PW_SendCommand("0023".$id_info['ObjectIdent']);
+		
+
+		}
+	}
   
   
 /***************************************************************************//**
@@ -886,7 +1035,7 @@ function request_circle_data() {
 *******************************************************************************/
 function hole_gesamtverbrauch()
 	{
-	
+		
 	GLOBAL $idCatOthers;
 	GLOBAL $idCatCircles;
 	GLOBAL $SystemStromzaehlerGroups;
@@ -911,10 +1060,16 @@ function hole_gesamtverbrauch()
 		if ( ID_LEISTUNG != 0 )
 			$id_leistung = ID_LEISTUNG;
 
-
+	$id_math = "*";
+	$id_faktor = 1;
    // IDs aus der Konfig lesen - neue Version
 	if ( isset( $SystemStromzaehlerGroups[0][2] ) )
-      $id_leistung = intval($SystemStromzaehlerGroups[0][2]);
+	   {
+		$id_leistung_str = str_replace(" ", "", $SystemStromzaehlerGroups[0][2]); ;
+      $id_leistung = intval($SystemStromzaehlerGroups[0][2]);  // erster Teil
+		$id_math = substr($id_leistung_str,5,1);
+		$id_faktor = substr($id_leistung_str,6);
+		}
 
 	if ( isset( $SystemStromzaehlerGroups[0][3] ) )
       $id_gesamt = intval($SystemStromzaehlerGroups[0][3]);
@@ -938,6 +1093,10 @@ function hole_gesamtverbrauch()
 		if ( IPS_ObjectExists($id_leistung) )
 	   	{
       	$d = GetValue($id_leistung);
+
+			if ( $id_math == '*' )
+			   $d = $d * $id_faktor;
+			   
 			$id = IPS_GetObjectIDByIdent('Leistung',$id1);
 			if (GetValue($id) <> $d)
 				SetValue($id,$d);

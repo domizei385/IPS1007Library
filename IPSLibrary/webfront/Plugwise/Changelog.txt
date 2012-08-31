@@ -1,6 +1,17 @@
+Version=1.2.1026
+ - Anzahl der Spalten und Zeilen in der Systemsteuerung variabel
+  define ( 'UEBERSICHTSPALTEN' , 3      );
+  define ( 'UEBERSICHTZEILEN'  , 10      );
+Version=1.2.1025
+ - Anzeige der Pingwerte , RSSISource , RSSITarget
+Version=1.2.1024
+ - Schalten eines Circles durch externe Scripte
+ - 'AUTORESTORESWITCH' in der Konfiguration schaltet Circle nach Stromausfall 
+    wieder in die letzte Sollstellung  
 Version=1.2.1023
  - Anzeigen in eine ~htmlBox
  - Profile der Variablen werden nicht mehr ueberschrieben
+ - Profile haben eigene Konfigurationsdatei
  - Aktionen bei bestimmten Werten sind moeglich
 Version=1.2.1022
  - automatisch Aktualisierung Highchart
