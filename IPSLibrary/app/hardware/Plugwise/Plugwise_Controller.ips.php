@@ -388,8 +388,6 @@ function plugwise_0013_received($buf)
 	$unknown2   = substr($buf,44,4);
 	$unknown3   = substr($buf,48,4);
 
-	$text = $mcID ."-".$totalpulse." ".$unknown1." ".$unknown2." ".$unknown3;
-	logging($text,$mcID .'plugwiseunknowninformation.log' );
 
 	if ( !$myCat)
 	   {
@@ -398,8 +396,35 @@ function plugwise_0013_received($buf)
 		return;
 	   }
 
-	$t = time()  ;
-	SetValue(IPS_GetVariableIDByName ("LastMessage", $myCat),$t);
+	// Circleantwortzeit berechnen
+	//$t = time()  ;
+	//SetValue(IPS_GetVariableIDByName ("LastMessage", $myCat),$t);
+
+	$id = IPS_GetVariableIDByName("LastMessage", $myCat);
+	$obj = IPS_GetObject(IPS_GetObjectIDByIdent("LastMessage",$myCat));
+	$string = $obj['ObjectInfo'];
+	$string_array = explode(";", $string);
+
+	$start_timestamp = @$string_array[0];
+	$ende_timestamp  = @$string_array[1];
+	$ende_timestamp  = microtime(true);
+	$string = $start_timestamp .";".$ende_timestamp;
+	$diff = round(($ende_timestamp - $start_timestamp) * 1000);
+
+
+	IPS_SetInfo($id,$string);
+   SetValue(IPS_GetVariableIDByName ("LastMessage", $myCat),$diff);
+
+
+	//IPS_LogMessage("Info","[".$string."]".$diff);
+	//*********************************************
+
+
+
+
+
+
+
 
 	If ($pulse == "FFFF")
 		{	// Circle ausgeschaltet, meldet FFFF ( nicht immer ?? )
@@ -465,6 +490,13 @@ function plugwise_0013_received($buf)
 			$offNoise = $offNoise_;
 
 
+	//IPS_LogMessage("Kalibrierdaten ungleich offNoise","[".$offNoise."]");
+		$verbrauch = pulsesToKwh(hexdec($totalpulse), $offNoise, $offTotal, $gainA, $gainB);
+		$text = $mcID ."-".$totalpulse." ".$unknown1." ".$unknown2." ".$unknown3."---".$verbrauch;
+		logging($text,$mcID .'plugwiseunknowninformation.log' );
+
+
+
 		   }
 		
 		// keine Kalibrierung
@@ -478,7 +510,7 @@ function plugwise_0013_received($buf)
 
 		// Aktueller Verbrauch in Watt ermitteln
 		if ( hexdec($pulse) > 0 )
-		   {
+		   { 
 			$value 	 = hexdec($pulse)/8;
 			$out 		 = (pow(($value+$offNoise),2)*$gainB)+(($value+$offNoise)*$gainA)+$offTotal;
 			$Leistung = (($out ) / 468.9385193)*1000;
@@ -511,8 +543,11 @@ function plugwise_0013_received($buf)
 	if ( GetValue($id ) != 0 )
 		SetValue($id,0);
 
-		
+
 	logging($text,'plugwisepowerinformation.log' );
+
+
+
 
 	}
 	
@@ -590,7 +625,7 @@ function plugwise_0024_received($buf)
          
    if ( $autorestore == false )
       {
-	   IPS_LogMessage("Plugwise","Autorestore false");
+	   
 
 		$einaus    = substr($buf,41,1);
 		$id        = IPS_GetVariableIDByName("Status",$myCat);
@@ -999,8 +1034,17 @@ function request_circle_data()
       if ( $t > $timeoutcircle )  // laenger als x Minuten keine Daten
       	{
       	$id = IPS_GetVariableIDByName("Error", $item);
-			if ( GetValue($id ) != 1 )
+      	
+         if ( defined('RUNSCRIPT_CIRCLEFAILED') )
+         	if ( GetValue($id ) == 0 )
+					if ( IPS_ScriptExists(RUNSCRIPT_CIRCLEFAILED) )
+				   	IPS_RunScriptEx(RUNSCRIPT_CIRCLEFAILED,array("CIRCLE" => IPS_GetName($item)));
+
+      	
+			if ( GetValue($id ) != 1 ) // Error setzen
 				SetValue($id,1);
+				
+				
 			// wenn Circle nicht erreichbar Leistung auf 0
 			IPS_LogMessage("Plugwise Circle ausgefallen",$t);
       	$id = IPS_GetVariableIDByName("Leistung", $item);
@@ -1017,10 +1061,24 @@ function request_circle_data()
 			
 		$id_info = IPS_GetObject($item);
 
+		
+		
+		$id = IPS_GetVariableIDByName("LastMessage", $item);
+		$obj = IPS_GetObject(IPS_GetObjectIDByIdent("LastMessage",$item));
+		$string = $obj['ObjectInfo'];
+		$string_array = explode(";", $string);
+
+		$start_timestamp = @$string_array[0];
+		$ende_timestamp  = @$string_array[1];
+		$start_timestamp = microtime(true);
+		$string = $start_timestamp .";".$ende_timestamp;
+
+		//IPS_LogMessage(".......",$string);
+		
+		//$timestamp = microtime(true).";0";
+		IPS_SetInfo(IPS_GetObjectIDByIdent("LastMessage",$item),$string);
 		PW_SendCommand("0012".$id_info['ObjectIdent']);
 		
-		//SetValue(IPS_GetVariableIDByName ("LastMessage", $item),microtime(true));
-
 		PW_SendCommand("0023".$id_info['ObjectIdent']);
 		
 

@@ -195,15 +195,19 @@ function bintofloat($in)
 /***************************************************************************//**
 *	Pulse zu kWh Umwandlung
 *******************************************************************************/
-function pulsesToKwh($value, $offRuis, $offTot, $gainA, $gainB) {
-        if ($value == hexdec("FFFFFFFF")) {
-            return 0;
-        } else {
-           $value = $value / 3600;
-            $pulses = (pow(($value + $offRuis), 2) * $gainB) + (($value + $offRuis) * $gainA) + $offTot;
-            $result = (($pulses / 3600) / 468.9385193)*3600;
-            return $result;
-        }
+function pulsesToKwh($value, $offRuis, $offTot, $gainA, $gainB)
+	{
+   if ($value == hexdec("FFFFFFFF") or $value == 0)
+		{
+      return 0;
+      }
+	else
+		{
+      $value = $value / 3600;
+      $pulses = (pow(($value + $offRuis), 2) * $gainB) + (($value + $offRuis) * $gainA) + $offTot;
+      $result = (($pulses / 3600) / 468.9385193)*3600;
+      return $result;
+      }
     }
 
 
@@ -316,6 +320,10 @@ function createCircle($mac, $parentID){
 	//if ( $id3 == false )
 		$id3 = CreateVariable("Gesamtverbrauch", 2, $item, 0, $Profil_Plugwise_Verbrauch[0], 0, 0);
 
+	$Profil_Plugwise_Kosten = 'Plugwise_Kosten';
+	$id4 = CreateVariable("Kosten", 2, $item, 0, $Profil_Plugwise_Kosten, 0, 0);
+	
+
   $aggtype = 1;   // Zaehler
   if ( defined('AGGTYPE') )
         $aggtype = AGGTYPE;
@@ -339,6 +347,12 @@ function createCircle($mac, $parentID){
   		AC_SetLoggingStatus($archive_id  , $id3, True); 	// Logging einschalten
   		AC_SetAggregationType($archive_id, $id3, $aggtype);// Logging auf Type setzen
       IPS_ApplyChanges($archive_id);
+
+  		AC_SetLoggingStatus($archive_id  , $id4, True); 	// Logging einschalten
+  		//AC_SetAggregationType($archive_id, $id4, $aggtype);// Logging auf Type setzen
+      IPS_ApplyChanges($archive_id);
+
+      
 		}
 
 	//$myVar = CreateVariable("gaina",2,$item,0,"",0,0);
@@ -525,6 +539,7 @@ function update_uebersicht_circles()
 		$data_array[$x]['CIRCLESWVERSION'] = "SW?" ;
 		$data_array[$x]['CIRCLEHWVERSION'] = "HW?" ;
 		$data_array[$x]['CIRCLELASTSEEN'] = 0 ;
+		$data_array[$x]['CIRCLELASTMILLISEC'] = 0 ;
 		$data_array[$x]['CIRCLEWATT'] = 0 ;
 		$data_array[$x]['CIRCLEKWH'] = 0 ;
 		$data_array[$x]['CIRCLEPINGMS'] = 0;
@@ -545,9 +560,23 @@ function update_uebersicht_circles()
 		$data_array[$counter]['CIRCLENEW'] = false;
 		$data_array[$counter]['CIRCLEERROR'] = @GetValue(IPS_GetVariableIDByName('Error',$circle));
 		$data_array[$counter]['CIRCLESTATUS'] = @GetValue(IPS_GetVariableIDByName('Status',$circle));
-		$last_seen = @GetValue(IPS_GetVariableIDByName('LastMessage',$circle));
-		$last_seen = intval($last_seen);
-		$data_array[$counter]['CIRCLELASTSEEN'] = date('d.m.Y H:i:s',$last_seen);
+
+
+		$objlastmessage = IPS_GetObject(IPS_GetObjectIDByIdent("LastMessage",$circle));
+		$string = $objlastmessage['ObjectInfo'];
+		$string_array = explode(";", $string);
+
+		$start_timestamp = @$string_array[0];
+		$ende_timestamp  = @$string_array[1];
+      $last_seen = intval($ende_timestamp);
+
+		$last_ms = @GetValue(IPS_GetVariableIDByName('LastMessage',$circle));
+		$last_ms = intval($last_ms);
+		$data_array[$counter]['CIRCLELASTSEEN'] = date('d.m.y H:i:s',$last_seen);
+		$data_array[$counter]['CIRCLELASTMILLISEC'] = $last_ms;
+		//
+
+
 
 		$watt = @number_format(GetValue(IPS_GetVariableIDByName('Leistung',$circle)),1,",","");
 		$y = strlen($watt);
@@ -634,10 +663,10 @@ function update_uebersicht_circles()
 		foreach($pingarr as $pingcircle )
 	   	{
 	   	$teile = explode(",",$pingcircle);
-	   	$teil_id    = @$teile[2];
-	   	$teil_rssi1 = @$teile[3];
-	   	$teil_rssi2 = @$teile[4];
-	   	$teil_ms    = @$teile[5];
+	   	$teil_id    = @$teile[1];
+	   	$teil_rssi1 = @$teile[2];
+	   	$teil_rssi2 = @$teile[3];
+	   	$teil_ms    = @$teile[4];
 
 			// suche in bereits erstellten array
 			$counter = 0;
@@ -650,7 +679,7 @@ function update_uebersicht_circles()
 				if($d_a['CIRCLEID'] == $teil_id)    // gefunden
 				   {
 	   			//IPS_Logmessage("plugwise",$d_a['CIRCLEID']);
-					$data_array[$counter]['CIRCLEPINGMS'] = $teil_ms;
+					$data_array[$counter]['CIRCLEPINGMS']    = $teil_ms;
 					$data_array[$counter]['CIRCLEPINGRSSI1'] = $teil_rssi1;
 					$data_array[$counter]['CIRCLEPINGRSSI2'] = $teil_rssi2;
 					
@@ -694,6 +723,7 @@ function update_uebersicht_circles()
 		   $c_swv    	 = $data_array[$start_data]['CIRCLESWVERSION'];
 		   $c_hwv     	 = $data_array[$start_data]['CIRCLEHWVERSION'];
 		   $c_ls     	 = $data_array[$start_data]['CIRCLELASTSEEN'];
+		   $c_lsms      = $data_array[$start_data]['CIRCLELASTMILLISEC'];
 		   $c_watt   	 = $data_array[$start_data]['CIRCLEWATT'];
 		   $c_kwh    	 = $data_array[$start_data]['CIRCLEKWH'];
 		   $c_pingms    = $data_array[$start_data]['CIRCLEPINGMS'];
@@ -747,6 +777,7 @@ function update_uebersicht_circles()
 							$circletext = $circletext . "<img  src='/user/Plugwise/images/status_online.png'  align='absmiddle'>";
 
 						$circletext = $circletext . "<FONT  SIZE='3'>&nbsp;&nbsp;".$c_ls."</FONT>";
+						$circletext = $circletext . "<FONT  SIZE='4'>&nbsp;&nbsp;&nbsp;[&nbsp;".$c_lsms."&nbsp;]</FONT>";
 
 						$circletext = $circletext . "<br><center>" .$c_name ."</center>";
 						}
@@ -2517,8 +2548,10 @@ function circle_on_off($mac,$status)
 *******************************************************************************/
 function create_css3menu()
 	{
-	IPSUtils_Include ("Plugwise_CSS3Menu.inc.php","IPSLibrary::config::hardware::Plugwise");
+	
 	return;
+	IPSUtils_Include ("Plugwise_CSS3Menu.inc.php","IPSLibrary::config::hardware::Plugwise");
+	
 	GLOBAL $CSS3_Plugwise_Menu;
 	GLOBAL $CSS3_Plugwise_CSSFile;
 
@@ -2531,14 +2564,14 @@ function create_css3menu()
 
 	$html = "";
 	$counter = 0;
-
+	echo $CSS3_Plugwise_CSSFile;
    $html = "";
    $html = $html . '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd/">';
    $html = $html . '<html dir="ltr">';
 	$html = $html . '<head>';
 	$html = $html . '<meta http-equiv="content-type" content="text/html; charset=utf-8" />';
 //	$html = $html . '<!-- Start css3menu.com HEAD section -->';
-//	$html = $html . '<link rel="stylesheet" href="/User/Plugwise/style.css" type="text/css" />';
+	$html = $html . '<link rel="stylesheet" href="/User/Plugwise/css3menu/'.$CSS3_Plugwise_CSSFile.'" type="text/css" />';
 	$html = $html . '<!-- End css3menu.com HEAD section -->';
 	$html = $html . '</head>';
 	$html = $html . '<body style="background-color:#EBEBEB">';
